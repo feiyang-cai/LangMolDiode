@@ -12,6 +12,7 @@ dependencies = ["pyarrow", "rdkit"]
 [project.optional-dependencies]
 test = ["pytest"]
 sft = ["datasets", "transformers", "torch", "unsloth"]
+publish = ["huggingface_hub"]
 
 [tool.setuptools]
 packages = ["rl"]

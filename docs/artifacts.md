@@ -9,6 +9,7 @@ uploaded and verified private to the authenticated accounts.
 | `ChemFM/LangMolDiode-Qwen3.5-4B-SFT` | merged SFT base model |
 | `ChemFM/LangMolDiode-Qwen3.5-4B-SFT-LoRA` | SFT adapter, checkpoint 14190 |
 | `ChemFM/LangMolDiode-Qwen3.5-4B-RL-LoRA` | final step 1500 adapter at root; steps 1260, 1315, 1370 in named subfolders |
+| `ChemFM/LangMolDiode-SFT-Corpus` | Private 75,666-row verified SFT corpus with prompts, generated answers, training responses, model and reasoning-effort metadata |
 | [Box folder `419341962405`](https://clemson.app.box.com/folder/419341962405) | filtered SFT corpus, SFT and RL adapters, and per-dataset generated responses |
 
 For Box, the staged response files are under ignored

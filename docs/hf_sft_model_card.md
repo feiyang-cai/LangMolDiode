@@ -1,6 +1,8 @@
 ---
 library_name: transformers
 base_model: Qwen/Qwen3.5-4B
+datasets:
+  - ChemFM/LangMolDiode-SFT-Corpus
 tags:
   - chemistry
   - text-to-smiles
@@ -15,6 +17,8 @@ base for LangMolDiode DAPO training. The SFT seed is the Unsloth LoRA
 The model was prepared without the Qwen3.5 MTP head for the tested verl/vLLM
 training path. It accepts a molecular structure description and generates a
 SMILES answer inside `<smiles>...</smiles>` tags, usually with a reasoning trace.
+The verified training examples are in the private
+`ChemFM/LangMolDiode-SFT-Corpus` dataset.
 
 Load with `AutoModelForCausalLM.from_pretrained` or the compatible Qwen3.5
 model class. Text-only evaluation was used. The model is private while its

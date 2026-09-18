@@ -58,6 +58,14 @@ The SFT seed used for the RL run was `checkpoint-14190` from the June 18
 Qwen3.5-4B run. `scripts/run_sft.sh` accepts environment overrides for batch
 size, accumulation, learning rate, and checkpoint frequency.
 
+The exact filtered training corpus is also available as the private
+`ChemFM/LangMolDiode-SFT-Corpus` dataset. It includes the raw generator output,
+the exact SFT assistant response, model and reasoning-effort metadata, and an
+independently checked molecule-match flag. To rebuild it from the filtered
+JSONL and its linked curation artifacts, run
+`python scripts/build_sft_corpus_dataset.py --input TRAIN_40960.jsonl --output-dir .runtime/sft_corpus_release`.
+`scripts/publish_private_sft_corpus.py` only uploads to private dataset repos.
+
 ## RL
 
 Convert prepared prompt JSONL files with
