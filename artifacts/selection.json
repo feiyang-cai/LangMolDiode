@@ -12,25 +12,19 @@
       "rollout_step": 1260,
       "optimization_step": 20160,
       "num_prompts": 1972,
-      "exact@1": 0.8519269776876268,
-      "exact@2": 0.8752535496957403,
-      "exact@3": 0.8853955375253549
+      "exact@1": 0.8519269776876268
     },
     "mollangbench_test": {
       "rollout_step": 1315,
       "optimization_step": 21040,
       "num_prompts": 200,
-      "exact@1": 0.715,
-      "exact@2": 0.78,
-      "exact@3": 0.815
+      "exact@1": 0.715
     },
     "mollangbench_extended": {
       "rollout_step": 1370,
       "optimization_step": 21920,
       "num_prompts": 200,
-      "exact@1": 0.775,
-      "exact@2": 0.83,
-      "exact@3": 0.85
+      "exact@1": 0.775
     }
   }
 }

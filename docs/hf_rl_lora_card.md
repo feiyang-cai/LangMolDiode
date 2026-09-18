@@ -15,15 +15,14 @@ This private repository holds adapters from a Qwen3.5-4B DAPO run with
 Megatron-Bridge actor training and vLLM rollout. The root adapter is the final
 rollout step 1500. Additional adapters live under:
 
-| Subfolder | Selection set | Rollout step | exact@1 | exact@2 | exact@3 |
-| --- | --- | ---: | ---: | ---: | ---: |
-| `best_validated_step1260/` | 1,972 validated prompts | 1260 | 0.8519 | 0.8753 | 0.8854 |
-| `best_test_step1315/` | 200 MolLangBench test prompts | 1315 | 0.7150 | 0.7800 | 0.8150 |
-| `best_extended_step1370/` | 200 MolLangBench extended prompts | 1370 | 0.7750 | 0.8300 | 0.8500 |
+| Subfolder | Selection set | Rollout step | exact@1 |
+| --- | --- | ---: | ---: |
+| `best_validated_step1260/` | 1,972 validated prompts | 1260 | 0.8519 |
+| `best_test_step1315/` | 200 MolLangBench test prompts | 1315 | 0.7150 |
+| `best_extended_step1370/` | 200 MolLangBench extended prompts | 1370 | 0.7750 |
 
 Each validation prompt was sampled three times. `exact@1` is the first sample's
-canonical-SMILES exact match; `exact@2` and `exact@3` count any exact sample
-among the first two or three. Best means highest observed `exact@1` among the
+canonical-SMILES exact match. Best means highest observed `exact@1` among the
 full saved validation runs, with the earliest step winning a tie. Selection on
 the test and extended sets means their reported values should be treated as
 selection results, not untouched holdout estimates.
