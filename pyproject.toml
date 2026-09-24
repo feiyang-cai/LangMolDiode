@@ -7,7 +7,7 @@ name = "langmoldiode"
 version = "0.1.0"
 description = "SFT and DAPO training for text-to-molecule generation"
 requires-python = ">=3.10"
-dependencies = ["pyarrow", "rdkit"]
+dependencies = ["pyarrow", "rdkit", "requests"]
 
 [project.optional-dependencies]
 test = ["pytest"]
