@@ -35,8 +35,9 @@ results are reported in the [MolLangData paper](https://arxiv.org/abs/2602.02320
 
 ![LangMolDiode SFT and RL training trajectory](assets/training_trajectory.png)
 
-*Exact-match rate and average output length during SFT and RL on the MolLangData
-test set.*
+*LangMolDiode's SFT and RL trajectory and its comparison with much larger
+frontier LLMs on the MolLangData test set. Blue reports exact-match rate; red
+reports average output length.*
 
 ## Resources
 
@@ -51,8 +52,8 @@ test set.*
 
 ### Conda
 
-The Conda environment supports corpus preparation, SFT, evaluation, and artifact
-utilities. Create it from the repository root:
+The Conda environment supports corpus preparation, SFT, and evaluation. Create
+it from the repository root:
 
 ```bash
 git clone https://github.com/feiyang-cai/LangMolDiode.git
@@ -63,16 +64,12 @@ conda activate langmoldiode
 
 ### Apptainer
 
-The Apptainer environment is recommended for RL training. It is built from the
-verl Docker image and keeps caches under the repository rather than
-`~/.cache`.
+The Apptainer environment is recommended for RL training. One command downloads
+the upstream training code, pulls the verl image, and installs the Qwen3.5 and
+Megatron dependencies into project-local directories:
 
 ```bash
-bash scripts/bootstrap_upstream.sh
-bash scripts/pull_verl_apptainer.sh
-bash scripts/install_container_rdkit.sh
-bash scripts/install_container_qwen35_fastpath.sh
-bash scripts/install_megatron_bridge.sh
+bash scripts/setup_rl_environment.sh
 ```
 
 Run any command inside the prepared environment with:
@@ -81,8 +78,6 @@ Run any command inside the prepared environment with:
 bash scripts/run_in_apptainer.sh python -c "import verl; print('verl ready')"
 ```
 
-Set `VERL_SIF` to reuse an existing image instead of pulling a new one.
-
 ## Curating the SFT Corpus
 
 We use descriptions from the MolLangData training set as prompts, collect
@@ -90,12 +85,33 @@ reasoning traces and SMILES answers from stronger teacher models, retain only
 answers that reconstruct the target molecule, deduplicate by target molecule,
 and filter examples whose rendered Qwen sequence exceeds 40,960 tokens.
 
-Given generation artifacts containing the prompt, model response, target
-SMILES, and match result, build the reasoning SFT JSONL with:
+To curate responses directly from MolLangData, use any OpenAI-compatible
+chat-completions endpoint:
+
+```bash
+OPENAI_API_KEY=your_api_key \
+python sft/curate_sft_corpus.py \
+  --dataset ChemFM/MolLangData \
+  --dataset-config generated_data \
+  --split data \
+  --output data/teacher_generations.jsonl \
+  --base-url https://your-provider.example/v1 \
+  --model your-teacher-model \
+  --workers 8
+```
+
+The curator extracts the final tagged SMILES, verifies molecular equivalence
+with RDKit, retries unsuccessful generations, and retains only verified matches
+by default. Local endpoints can be used without an API key, and a local JSONL
+file with `description` and `smiles` fields can be supplied through `--input`.
+Keep the evaluation molecules out of the source used for training.
+
+Convert the verified generations into chat-training JSONL and apply the token
+length filter:
 
 ```bash
 python sft/prepare_sft_data.py \
-  --input-root /path/to/generation_artifacts \
+  --input-jsonl data/teacher_generations.jsonl \
   --output data/sft_train.jsonl \
   --response-mode qwen_think \
   --require-match \
@@ -181,7 +197,9 @@ Join our [Discord community](https://discord.gg/hpW7sdMQGP), or contact
 
 ## Citation
 
-If you find LangMolDiode useful, please cite our
+LangMolDiode is part of the
+[MolLangData project](https://github.com/TheLuoFengLab/MolLangData). If you find
+this work useful, please cite the
 [MolLangData paper](https://arxiv.org/abs/2602.02320):
 
 ```bibtex

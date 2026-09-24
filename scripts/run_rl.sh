@@ -7,8 +7,7 @@ verl_recipe_src="${VERL_RECIPE_SRC:-$repo_root/third_party/verl-recipe-rolling-b
 general_deps="$repo_root/containers/python_deps"
 megatron_deps="$repo_root/containers/python_deps_megatron_bridge"
 
-# Patched by Codex for MolLang training: Qwen3.5 Megatron needs both the
-# Megatron-Bridge overlay and the general MolLang CUDA deps (FLA/causal-conv1d).
+# Qwen3.5 Megatron uses both the Megatron-Bridge overlay and the FLA runtime.
 export PYTHONPATH="$megatron_deps:$general_deps:$verl_recipe_src:$repo_root:$verl_src:${PYTHONPATH:-}"
 export TOKENIZERS_PARALLELISM="${TOKENIZERS_PARALLELISM:-false}"
 export HF_HOME="${HF_HOME:-$repo_root/.runtime/hf_home}"

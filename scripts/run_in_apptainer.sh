@@ -23,14 +23,13 @@ deps_dir="${MOLLANG_PYTHON_DEPS:-$repo_root/containers/python_deps}"
 megatron_deps_dir="${MOLLANG_MEGATRON_PYTHON_DEPS:-$repo_root/containers/python_deps_megatron_bridge}"
 runtime_home="${MOLLANG_CONTAINER_HOME:-$repo_root/containers/home}"
 runtime_cache="${MOLLANG_RUNTIME_CACHE:-$repo_root/containers/runtime_cache}"
-# Patched by Codex for MolLang training: keep caches repo-local, but use
-# node-local /tmp for transient multiprocessing/Ray files to avoid NFS .nfs
-# cleanup warnings during long validation and rollout phases.
+# Keep persistent caches project-local and transient multiprocessing files in
+# node-local /tmp.
 runtime_tmp="${MOLLANG_RUNTIME_TMP:-/tmp/langmoldiode_${USER:-user}_tmp}"
 
 if [[ ! -f "$sif_path" ]]; then
   echo "Missing Apptainer image: $sif_path" >&2
-  echo "Run scripts/pull_verl_apptainer.sh first, or set VERL_SIF." >&2
+  echo "Run scripts/setup_rl_environment.sh first." >&2
   exit 1
 fi
 
@@ -48,10 +47,8 @@ fi
 
 host_wandb_netrc="${WANDB_NETRC:-${HOME:-}/.netrc}"
 if [[ -z "${WANDB_API_KEY+x}" && -r "$host_wandb_netrc" ]]; then
-  # Patched by Codex for MolLang training: the container runs with --cleanenv
-  # and HOME redirected to a project-local directory, so W&B cannot see the
-  # normal host login. Bind the host netrc read-only into the container home
-  # instead of copying secrets or using ~/.cache.
+  # The container uses --cleanenv and a project-local HOME. Bind the host netrc
+  # read-only so authenticated W&B logging still works.
   mkdir -p "$runtime_home"
   if [[ ! -e "$runtime_home/.netrc" ]]; then
     touch "$runtime_home/.netrc"
@@ -89,9 +86,7 @@ if [[ -d "$deps_dir" ]]; then
   pythonpath="$deps_dir:$pythonpath"
 fi
 if [[ -d "$megatron_deps_dir" ]]; then
-  # Patched by Codex for MolLang training: Ray workers for Megatron launches
-  # are spawned from the Ray cluster environment, not only the trainer driver.
-  # Keep Megatron-Bridge visible when starting ray head/worker inside Apptainer.
+  # Ray workers inherit this path when Megatron launches through the cluster.
   pythonpath="$megatron_deps_dir:$pythonpath"
 fi
 
@@ -162,9 +157,7 @@ for key in "${passthrough_keys[@]}"; do
   fi
 done
 
-# Patched by Codex for MolLang training: this FlashInfer build derives its
-# JIT lock/cache path from FLASHINFER_WORKSPACE_BASE; keep it off ~/.cache and,
-# for multi-node tests, let MOLLANG_RUNTIME_CACHE point it at node-local /tmp.
+# FlashInfer derives its JIT lock path from FLASHINFER_WORKSPACE_BASE.
 apptainer exec --nv --cleanenv --no-home \
   "${bind_args[@]}" \
   --pwd "$repo_root" \

@@ -6,4 +6,4 @@ dependencies:
   - pip
   - git
   - pip:
-      - -e .[sft,publish]
+      - -e .[sft]
