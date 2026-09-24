@@ -6,14 +6,14 @@
 [![GitHub forks](https://img.shields.io/github/forks/feiyang-cai/LangMolDiode.svg)](https://github.com/feiyang-cai/LangMolDiode/network/members)
 [![GitHub issues](https://img.shields.io/github/issues/feiyang-cai/LangMolDiode.svg)](https://github.com/feiyang-cai/LangMolDiode/issues)
 [![Paper](https://img.shields.io/badge/arXiv-2602.02320-b31b1b.svg)](https://arxiv.org/abs/2602.02320)
-[![MolLangData](https://img.shields.io/badge/Hugging%20Face-MolLangData-yellow.svg)](https://huggingface.co/datasets/ChemFM/MolLangData)
-[![Checkpoints](https://img.shields.io/badge/Hugging%20Face-Checkpoints-yellow.svg)](https://huggingface.co/ChemFM/LangMolDiode-Qwen3.5-4B-RL-LoRA)
+[![Checkpoints](https://img.shields.io/badge/Hugging%20Face-Checkpoints-yellow.svg)](https://huggingface.co/collections/ChemFM/langmoldiode-checkpoints-6ab584bbd214ff6dc2756714)
+[![Discord](https://img.shields.io/badge/Discord-join-7289da.svg)](https://discord.gg/hpW7sdMQGP)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](environment.yml)
 
-**LangMolDiode** trains a compact language model to translate detailed molecular
-structure descriptions into SMILES. It combines reasoning SFT on
-[MolLangData](https://github.com/TheLuoFengLab/MolLangData) with DAPO
-reinforcement learning for accurate and token-efficient molecule generation.
+**LangMolDiode** is a language-conditional molecule generator that produces
+SMILES from detailed molecular structure descriptions. It is built on
+Qwen3.5-4B and trained with reinforcement learning using the curated
+[MolLangData dataset](https://github.com/TheLuoFengLab/MolLangData).
 
 ## Results
 
@@ -31,27 +31,21 @@ equivalent non-identical SMILES strings count as correct.
 
 The best-checkpoint row selects a checkpoint independently for each evaluation
 set; it is not one shared checkpoint. Full validity and Tanimoto-similarity
-results are reported in the MolLangData paper.
+results are reported in the [MolLangData paper](https://arxiv.org/abs/2602.02320).
 
 ![LangMolDiode SFT and RL training trajectory](assets/training_trajectory.png)
 
-*Exact-match rate and average output length during SFT and RL on the 1,972-sample
-MolLangData test set, reproduced from the MolLangData paper. One RL rollout step
-contains 16 optimization steps.*
+*Exact-match rate and average output length during SFT and RL on the MolLangData
+test set.*
 
 ## Resources
-
-The model and corpus repositories are private while the release is being
-prepared and will be opened with the public release.
 
 | Resource | Links | Description |
 | --- | --- | --- |
 | MolLangData | [GitHub](https://github.com/TheLuoFengLab/MolLangData) / [Hugging Face](https://huggingface.co/datasets/ChemFM/MolLangData) | Source molecule-description dataset |
 | MolLangBench | [GitHub](https://github.com/TheLuoFengLab/MolLangBench) / [Hugging Face](https://huggingface.co/datasets/ChemFM/MolLangBench) | Core and extended evaluation sets |
 | SFT training corpus | [Hugging Face](https://huggingface.co/datasets/ChemFM/LangMolDiode-SFT-Corpus) / [Box](https://clemson.app.box.com/folder/419341962405) | 75,666 verified reasoning traces and final answers |
-| Merged post-SFT model | [Hugging Face](https://huggingface.co/ChemFM/LangMolDiode-Qwen3.5-4B-SFT) | Standalone SFT model used as the RL base |
-| Post-SFT LoRA | [Hugging Face](https://huggingface.co/ChemFM/LangMolDiode-Qwen3.5-4B-SFT-LoRA) | SFT adapter for Qwen3.5-4B |
-| Post-RL and selected LoRAs | [Hugging Face](https://huggingface.co/ChemFM/LangMolDiode-Qwen3.5-4B-RL-LoRA) | Final RL adapter and three per-set selected adapters |
+| Model checkpoints | [Hugging Face collection](https://huggingface.co/collections/ChemFM/langmoldiode-checkpoints-6ab584bbd214ff6dc2756714) | Post-SFT model and SFT/RL LoRA adapters |
 
 ## Installation
 
@@ -127,14 +121,11 @@ python sft/export_sft_corpus.py \
   --output data/sft_train_max40960.jsonl
 ```
 
-Authenticate with `hf auth login` first while the corpus is private. The
-exporter also accepts local Parquet shards through `--data-files`.
-
 Every released row passed an independent RDKit molecular-equivalence check.
 
 ## SFT Training
 
-Launch the three-epoch, eight-GPU LoRA training job from an allocated GPU node:
+Launch the three-epoch, eight-GPU LoRA training:
 
 ```bash
 TRAIN_JSONL=data/sft_train_max40960.jsonl \
@@ -178,22 +169,20 @@ RUN_NAME=langmoldiode_dapo \
 bash scripts/run_in_apptainer.sh scripts/run_rl.sh
 ```
 
-The launcher uses vLLM rollout, Megatron-Bridge LoRA optimization, DAPO dynamic
-sampling, token-level policy loss, rollout correction, and the molecular reward
-in `rl/reward.py`. Review `scripts/run_rl.sh` for all configurable environment
-variables before a full-scale run.
+Training and rollout settings can be configured with environment variables in
+`scripts/run_rl.sh`.
 
 ## Contact
 
 For bugs, feature requests, or reproducibility questions, please
 [open a GitHub issue](https://github.com/feiyang-cai/LangMolDiode/issues).
-For research questions, contact **Feiyang Cai** at
-[feiyang@clemson.edu](mailto:feiyang@clemson.edu).
+Join our [Discord community](https://discord.gg/hpW7sdMQGP), or contact
+**Feiyang Cai** at [feiyang@clemson.edu](mailto:feiyang@clemson.edu).
 
 ## Citation
 
-LangMolDiode is presented as the language-conditional molecule-generation study
-in the MolLangData paper. Please cite:
+If you find LangMolDiode useful, please cite our
+[MolLangData paper](https://arxiv.org/abs/2602.02320):
 
 ```bibtex
 @article{MolLangData,
