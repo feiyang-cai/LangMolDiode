@@ -1,0 +1,185 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "$#" -lt 1 ]]; then
+  echo "Usage: scripts/run_in_apptainer.sh <command> [args...]" >&2
+  exit 2
+fi
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+resolve_path() {
+  local path="$1"
+  if [[ "$path" = /* ]]; then
+    printf '%s\n' "$path"
+  else
+    printf '%s/%s\n' "$repo_root" "$path"
+  fi
+}
+
+verl_src="$(resolve_path "${VERL_SRC:-third_party/verl-rolling-bcb638-full}")"
+recipe_src="$(resolve_path "${VERL_RECIPE_SRC:-third_party/verl-recipe-rolling-ba246-full}")"
+sif_path="${VERL_SIF:-$repo_root/containers/verl_vllm023_dev1.sif}"
+deps_dir="${MOLLANG_PYTHON_DEPS:-$repo_root/containers/python_deps}"
+megatron_deps_dir="${MOLLANG_MEGATRON_PYTHON_DEPS:-$repo_root/containers/python_deps_megatron_bridge}"
+runtime_home="${MOLLANG_CONTAINER_HOME:-$repo_root/containers/home}"
+runtime_cache="${MOLLANG_RUNTIME_CACHE:-$repo_root/containers/runtime_cache}"
+# Keep persistent caches project-local and transient multiprocessing files in
+# node-local /tmp.
+runtime_tmp="${MOLLANG_RUNTIME_TMP:-/tmp/langmoldiode_${USER:-user}_tmp}"
+
+if [[ ! -f "$sif_path" ]]; then
+  echo "Missing Apptainer image: $sif_path" >&2
+  echo "Run scripts/setup_rl_environment.sh first." >&2
+  exit 1
+fi
+
+binds=(
+  "$repo_root:$repo_root"
+  "/project:/project"
+  "/tmp:/tmp"
+)
+if [[ -d "$verl_src" && "$verl_src" != "$repo_root"/* ]]; then
+  binds+=("$verl_src:$verl_src")
+fi
+if [[ -d /scratch ]]; then
+  binds+=("/scratch:/scratch")
+fi
+
+host_wandb_netrc="${WANDB_NETRC:-${HOME:-}/.netrc}"
+if [[ -z "${WANDB_API_KEY+x}" && -r "$host_wandb_netrc" ]]; then
+  # The container uses --cleanenv and a project-local HOME. Bind the host netrc
+  # read-only so authenticated W&B logging still works.
+  mkdir -p "$runtime_home"
+  if [[ ! -e "$runtime_home/.netrc" ]]; then
+    touch "$runtime_home/.netrc"
+  fi
+  binds+=("$host_wandb_netrc:$runtime_home/.netrc:ro")
+fi
+
+bind_args=()
+for bind in "${binds[@]}"; do
+  bind_args+=("-B" "$bind")
+done
+
+export HF_HOME="${HF_HOME:-$repo_root/.runtime/hf_home}"
+export TOKENIZERS_PARALLELISM="${TOKENIZERS_PARALLELISM:-false}"
+export VLLM_USE_V1="${VLLM_USE_V1:-1}"
+mkdir -p \
+  "$runtime_home" \
+  "$runtime_tmp" \
+  "$runtime_cache/xdg" \
+  "$runtime_cache/vllm" \
+  "$runtime_cache/torchinductor" \
+  "$runtime_cache/triton" \
+  "$runtime_cache/flashinfer" \
+  "$runtime_cache/flashinfer_workspace" \
+  "$runtime_cache/cuda" \
+  "$runtime_cache/wandb" \
+  "$runtime_cache/wandb_config" \
+  "$runtime_cache/apptainer"
+export APPTAINER_CACHEDIR="${APPTAINER_CACHEDIR:-$runtime_cache/apptainer}"
+pythonpath="$repo_root:$verl_src:${PYTHONPATH:-}"
+if [[ -d "$recipe_src/dapo" ]]; then
+  pythonpath="$recipe_src:$pythonpath"
+fi
+if [[ -d "$deps_dir" ]]; then
+  pythonpath="$deps_dir:$pythonpath"
+fi
+if [[ -d "$megatron_deps_dir" ]]; then
+  # Ray workers inherit this path when Megatron launches through the cluster.
+  pythonpath="$megatron_deps_dir:$pythonpath"
+fi
+
+passthrough_keys=(
+  VERL_SRC VERL_RECIPE_SRC MOLLANG_MEGATRON_PYTHON_DEPS MODEL_PATH DATA_DIR TRAIN_FILE VAL_FILE COMBINED_VAL_FILE
+  VERL_TRAINER_ENTRYPOINT
+  MAX_PROMPT_LENGTH MAX_RESPONSE_LENGTH MAX_MODEL_LEN GPUS_PER_NODE NNODES
+  DUMMY_SEQ_LEN DUMMY_BATCH_SIZE DUMMY_NUM_MICROBATCHES DUMMY_OPTIMIZER_STEP
+  DUMMY_PROBE_OUTPUT DUMMY_LOSS_MODE DUMMY_RESPONSE_LEN
+  DUMMY_INCLUDE_ENTROPY DUMMY_ENTROPY_CHUNK_SIZE
+  DUMMY_NO_ATTENTION_MASK DUMMY_NO_GRADIENT_CHECKPOINTING ATTN_IMPLEMENTATION
+  MOLLANG_UPDATE_PROBE_GLOBAL_BATCH MOLLANG_UPDATE_PROBE_PROMPT_LEN MOLLANG_UPDATE_PROBE_RESPONSE_LEN
+  MOLLANG_UPDATE_PROBE_PROFILE MOLLANG_UPDATE_PROBE_CAP_FRAC MOLLANG_UPDATE_PROBE_SEED MOLLANG_UPDATE_PROBE_VOCAB_SIZE
+  MOLLANG_UPDATE_PROBE_POSITION_LAYOUT MOLLANG_UPDATE_PROBE_RESERVE_GIB
+  MOLLANG_LOGPROB_PROBE_GLOBAL_BATCH MOLLANG_LOGPROB_PROBE_PROMPT_LEN MOLLANG_LOGPROB_PROBE_RESPONSE_LEN
+  MOLLANG_LOGPROB_PROBE_PROFILE MOLLANG_LOGPROB_PROBE_CAP_FRAC MOLLANG_LOGPROB_PROBE_SEED MOLLANG_LOGPROB_PROBE_VOCAB_SIZE
+  LORA_RANK LORA_ALPHA LORA_TARGET_MODULES SL_LORA_ADAPTER_PATH
+  TRAIN_BATCH_SIZE TRAIN_BATCH_SIZE_OVERRIDE GEN_BATCH_SIZE
+  PPO_MINI_BATCH_SIZE PPO_MINI_BATCH_SIZE_OVERRIDE PPO_EPOCHS
+  NUM_GENERATIONS TOTAL_TRAINING_STEPS TOTAL_EPOCHS TRAIN_MAX_SAMPLES VAL_MAX_SAMPLES VAL_BATCH_SIZE
+  VAL_GENERATIONS VAL_DO_SAMPLE VAL_TEMPERATURE VAL_TOP_P VAL_TOP_K
+  RUN_NAME RUN_NAME_PREFIX OUTPUT_DIR OUTPUT_BASE LOG_PATH ROLLOUT_DATA_DIR VALIDATION_DATA_DIR LOG_VAL_GENERATIONS
+  ACTOR_MAX_TOKEN_LEN_PER_GPU LOG_PROB_MAX_TOKEN_LEN_PER_GPU REF_LOG_PROB_MAX_TOKEN_LEN_PER_GPU
+  ACTOR_ENABLE_ACTIVATION_OFFLOAD VLLM_MAX_NUM_BATCHED_TOKENS VLLM_MAX_NUM_SEQS VLLM_MAX_NUM_SEQS_OVERRIDE
+  VLLM_GPU_MEMORY_UTILIZATION VLLM_GPU_MEMORY_UTILIZATION_OVERRIDE VLLM_PREFIX_CACHING VLLM_ENFORCE_EAGER
+  VLLM_LOGGING_LEVEL VLLM_ENGINE_ITERATION_TIMEOUT_S VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS
+  VLLM_DISABLE_CUSTOM_ALL_REDUCE VLLM_DISTRIBUTED_EXECUTOR_BACKEND VLLM_GDN_PREFILL_BACKEND MOLLANG_VLLM_NCCL_P2P_DISABLE
+  ROLLOUT_TP ROLLOUT_BACKEND ROLLOUT_LAYERED_SUMMON ROLLOUT_FREE_CACHE_ENGINE ROLLOUT_CALCULATE_LOG_PROBS TEMPERATURE TOP_P TOP_K
+  FILTER_GROUPS_ENABLE FILTER_GROUPS_METRIC FILTER_GROUPS_MAX_NUM_GEN_BATCHES
+  ROLLOUT_CORRECTION_BYPASS_MODE ROLLOUT_IS ROLLOUT_IS_THRESHOLD ROLLOUT_IS_BATCH_NORMALIZE ROLLOUT_RS ROLLOUT_RS_THRESHOLD
+  PPO_MICRO_BATCH_SIZE_PER_GPU LOG_PROB_MICRO_BATCH_SIZE_PER_GPU REF_LOG_PROB_MICRO_BATCH_SIZE_PER_GPU
+  ACTOR_STRATEGY REF_STRATEGY FSDP_SIZE SP_SIZE ACTOR_LR WEIGHT_DECAY WARMUP_STEPS LR_SCHEDULER_TYPE
+  ACTOR_PARAM_OFFLOAD ACTOR_OPTIMIZER_OFFLOAD REF_PARAM_OFFLOAD
+  ACTOR_USE_DYNAMIC_BSZ ACTOR_USE_TORCH_COMPILE REF_USE_TORCH_COMPILE
+  VERL_LOGGING_LEVEL
+  MOLLANG_VERL_PATCH_NESTED_INDEX_SELECT MOLLANG_VERL_PATCH_QWEN35_TEXT_POSITION_IDS
+  MOLLANG_VERL_PATCH_ULYSSES_CONTIGUOUS_POSITION_IDS
+  MOLLANG_VERL_PATCH_WANDB_HISTORY MOLLANG_VERL_PATCH_MEMORY_INSTRUMENTATION
+  MOLLANG_VERL_QWEN35_POSITION_DEBUG MOLLANG_VERL_QWEN35_DEBUG_RANGES MOLLANG_VERL_QWEN35_DEBUG_LIMIT
+  MOLLANG_VERL_VALIDATE_TEXT_POSITION_IDS MOLLANG_VERL_ULYSSES_GROUPED_LAYOUT MOLLANG_VERL_ULYSSES_INFER_GROUP_LAYOUT
+  MOLLANG_VERL_ULYSSES_NORMALIZE_LOG_LIMIT MOLLANG_VERL_ULYSSES_UNHANDLED_LOG_LIMIT
+  MOLLANG_VERL_ULYSSES_CONTIGUOUS_LOG_LIMIT
+  MOLLANG_SKIP_UPSTREAM_PIN_CHECK MOLLANG_SKIP_ENV_CHECK
+  CUDA_VISIBLE_DEVICES
+  VLLM_SWEEP_MODEL VLLM_SWEEP_LORA VLLM_SWEEP_DATA VLLM_SWEEP_OUTPUT
+  VLLM_SWEEP_NUM_PROMPTS VLLM_SWEEP_REPEAT_PER_PROMPT VLLM_SWEEP_MAX_PROMPT_LENGTH
+  VLLM_SWEEP_MAX_TOKENS VLLM_SWEEP_MAX_MODEL_LEN VLLM_SWEEP_GPU_MEMORY_UTILIZATION
+  VLLM_SWEEP_MAX_NUM_SEQS VLLM_SWEEP_MAX_NUM_BATCHED_TOKENS VLLM_SWEEP_TEMPERATURE
+  VLLM_SWEEP_TOP_P VLLM_SWEEP_TOP_K VLLM_SWEEP_REPETITION_PENALTY
+  VLLM_SWEEP_IGNORE_EOS VLLM_SWEEP_ENABLE_LORA VLLM_SWEEP_SEED
+  USE_KL_LOSS KL_LOSS_COEF ENTROPY_COEFF CLIP_RATIO CLIP_RATIO_LOW CLIP_RATIO_HIGH CLIP_RATIO_C LOSS_AGG_MODE
+  OVERLONG_REWARD OVERLONG_EXPECTED_TOKENS OVERLONG_BUFFER_LEN OVERLONG_PENALTY_FACTOR OVERLONG_LOG REWARD_MANAGER
+  REWARD_FUNCTION_PATH REWARD_FUNCTION_NAME
+  TRAINER_LOGGER PROJECT_NAME TEST_FREQ SAVE_FREQ BALANCE_BATCH VAL_BEFORE_TRAIN
+  RESUME_MODE RESUME_FROM_PATH RAY_NUM_CPUS RAY_TMPDIR
+  NCCL_SOCKET_IFNAME NCCL_DEBUG NCCL_IB_HCA NCCL_NET_GDR_LEVEL NCCL_NET_GDR_READ
+  NCCL_CROSS_NIC NCCL_IB_MERGE_NICS GLOO_SOCKET_IFNAME
+  OMP_NUM_THREADS MKL_NUM_THREADS OPENBLAS_NUM_THREADS NUMEXPR_NUM_THREADS RAYON_NUM_THREADS VECLIB_MAXIMUM_THREADS
+  MODEL_USE_SHM MOLLANG_REWARD_CONFIG_JSON
+  HF_TOKEN HF_HUB_OFFLINE TRANSFORMERS_OFFLINE WANDB_API_KEY WANDB_PROJECT WANDB_ENTITY WANDB_MODE WANDB_DIR WANDB_CACHE_DIR WANDB_CONFIG_DIR
+  MAX_JOBS CMAKE_BUILD_PARALLEL_LEVEL
+  CUDA_LAUNCH_BLOCKING PYTORCH_CUDA_ALLOC_CONF TORCH_CUDA_ARCH_LIST
+)
+extra_env_args=()
+for key in "${passthrough_keys[@]}"; do
+  if [[ -n "${!key+x}" ]]; then
+    extra_env_args+=("$key=${!key}")
+  fi
+done
+
+# FlashInfer derives its JIT lock path from FLASHINFER_WORKSPACE_BASE.
+apptainer exec --nv --cleanenv --no-home \
+  "${bind_args[@]}" \
+  --pwd "$repo_root" \
+  "$sif_path" \
+  env \
+    "HOME=$runtime_home" \
+    "TMPDIR=$runtime_tmp" \
+    "HF_HOME=$HF_HOME" \
+    "XDG_CACHE_HOME=$runtime_cache/xdg" \
+    "VLLM_CACHE_ROOT=$runtime_cache/vllm" \
+    "TORCH_HOME=$runtime_cache/torch" \
+    "TORCHINDUCTOR_CACHE_DIR=$runtime_cache/torchinductor" \
+    "TRITON_CACHE_DIR=$runtime_cache/triton" \
+    "FLASHINFER_CACHE_DIR=$runtime_cache/flashinfer" \
+    "FLASHINFER_WORKSPACE_BASE=$runtime_cache/flashinfer_workspace" \
+    "FLASHINFER_JIT_DIR=$runtime_cache/flashinfer" \
+    "FLASHINFER_JIT_CACHE_DIR=$runtime_cache/flashinfer" \
+    "CUDA_CACHE_PATH=$runtime_cache/cuda" \
+    "WANDB_CACHE_DIR=${WANDB_CACHE_DIR:-$runtime_cache/wandb}" \
+    "WANDB_CONFIG_DIR=${WANDB_CONFIG_DIR:-$runtime_cache/wandb_config}" \
+    "TOKENIZERS_PARALLELISM=$TOKENIZERS_PARALLELISM" \
+    "VLLM_USE_V1=$VLLM_USE_V1" \
+    "PYTHONPATH=$pythonpath" \
+    "${extra_env_args[@]}" \
+    "$@"
