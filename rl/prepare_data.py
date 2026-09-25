@@ -14,7 +14,7 @@ DEFAULT_MOLLANGDATA_DATASET = "mollangdata/MolLangData"
 DEFAULT_MOLLANGDATA_TRAIN_CONFIG = "generated_data"
 DEFAULT_MOLLANGDATA_VAL_CONFIG = "validated_data"
 DEFAULT_MOLLANGDATA_SPLIT = "data"
-DEFAULT_MOLLANGBENCH_DATASET = "ChemFM/MolLangBench"
+DEFAULT_MOLLANGBENCH_DATASET = None
 DEFAULT_MOLLANGBENCH_CONFIG = "generation"
 DEFAULT_PROMPT_TEMPLATE = """**Instructions:**
 Analyze the given molecule structure description and generate the corresponding molecular structure as SMILES representation.
@@ -452,6 +452,10 @@ def parse_args() -> argparse.Namespace:
             parser.error(
                 "local JSONL mode requires both MolLangBench files unless --skip-bench is set"
             )
+    if not all(local_values) and not args.skip_bench and not args.mollangbench_dataset:
+        parser.error(
+            "provide --mollangbench-dataset for benchmark evaluation or use --skip-bench"
+        )
     if args.batch_size <= 0:
         parser.error("--batch-size must be positive")
     return args

@@ -19,7 +19,6 @@ The following project resources are hosted anonymously for double-blind review.
 | Resource | Links | Description |
 | --- | --- | --- |
 | MolLangData | [Anonymous Hugging Face dataset](https://huggingface.co/datasets/mollangdata/MolLangData) | Source molecule-description dataset |
-| MolLangBench | [External Hugging Face dataset](https://huggingface.co/datasets/ChemFM/MolLangBench) | External core and extended generation evaluation sets |
 | SFT training corpus | [Anonymous Hugging Face dataset](https://huggingface.co/datasets/mollangdata/LangMolDiode-SFT-Corpus) | 75,666 verified reasoning traces and final answers |
 | Model checkpoints | [Anonymous Hugging Face collection](https://huggingface.co/collections/mollangdata/langmoldiode-checkpoints-6aad8ee76122dd2c28fde274) | Post-SFT model and SFT/RL LoRA adapters |
 
@@ -132,12 +131,12 @@ two gradient-accumulation steps, eight GPUs, and a learning rate of 2e-4.
 
 ## RL Training
 
-Download the released MolLangData training and held-out sets together with the
-external MolLangBench generation benchmark, convert them to verl Parquet, and
-apply the same prompt-token filter used for training:
+Download the anonymous MolLangData training and held-out sets, convert them to
+verl Parquet, and apply the same prompt-token filter used for training:
 
 ```bash
 python -m rl.prepare_data \
+  --skip-bench \
   --output-dir data/verl
 
 python rl/filter_prompt_tokens.py \
@@ -147,18 +146,20 @@ python rl/filter_prompt_tokens.py \
   --max-prompt-length 2048
 ```
 
-This produces 161,111 MolLangData training prompts and a combined validation
-file containing 1,972 accepted MolLangData examples plus the 200-example core
-and 200-example extended MolLangBench generation sets. Local prepared JSONL can
-still be supplied with `--train-jsonl`, `--val-jsonl`,
-`--bench-test-jsonl`, and `--bench-extended-jsonl`.
+This produces 161,111 MolLangData training prompts and 1,972 accepted
+MolLangData validation examples. To include the MolLangBench core and extended
+generation sets used in the study, supply a reviewer-provided dataset identifier
+with `--mollangbench-dataset`; no identifying external dataset URL is embedded
+in this anonymous release. Local prepared JSONL can instead be supplied with
+`--train-jsonl`, `--val-jsonl`, `--bench-test-jsonl`, and
+`--bench-extended-jsonl`.
 
 Launch DAPO from the head of a two-node Ray cluster with eight GPUs per node:
 
 ```bash
 MODEL_PATH=/path/to/merged_sft_model \
 TRAIN_FILE=data/verl/train_maxprompt2048.parquet \
-VAL_FILE=data/verl/val_mollangbench_combined.parquet \
+VAL_FILE=data/verl/val.parquet \
 RUN_NAME=langmoldiode_dapo \
 bash scripts/run_in_apptainer.sh scripts/run_rl.sh \
   +ray_kwargs.ray_init.address=auto \
