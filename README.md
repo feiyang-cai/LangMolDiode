@@ -9,6 +9,7 @@
 [![Checkpoints](https://img.shields.io/badge/Hugging%20Face-Checkpoints-yellow.svg)](https://huggingface.co/collections/ChemFM/langmoldiode-checkpoints-6ab584bbd214ff6dc2756714)
 [![Discord](https://img.shields.io/badge/Discord-join-7289da.svg)](https://discord.gg/hpW7sdMQGP)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](environment.yml)
+[![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-blue.svg)](LICENSE)
 
 **LangMolDiode** is a language-conditional molecule generator that produces
 SMILES from detailed molecular structure descriptions. It is built on
@@ -210,5 +211,12 @@ this work useful, please cite the
   journal={arXiv preprint arXiv:2602.02320},
 }
 ```
+
+## License
+
+LangMolDiode is available under the
+[PolyForm Noncommercial License 1.0.0](LICENSE). It may be used for
+noncommercial research, education, and other purposes permitted by the license.
+Commercial use requires separate permission from the licensors.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
