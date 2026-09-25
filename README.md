@@ -18,8 +18,9 @@ Qwen3.5-4B and trained with reinforcement learning using the curated
 
 ## Results
 
-We evaluate on the held-out MolLangData test set and the MolLangBench core and
-extended generation sets. The table reports exact molecular match and average
+We evaluate on the held-out MolLangData test set and on MolLangBench, our
+previously released benchmark of human-written and human-validated molecular
+structure descriptions. The table reports exact molecular match and average
 output tokens. A match is determined from canonical isomeric SMILES, so
 equivalent non-identical SMILES strings count as correct.
 
@@ -45,7 +46,7 @@ reports average output length.*
 | Resource | Links | Description |
 | --- | --- | --- |
 | MolLangData | [GitHub](https://github.com/TheLuoFengLab/MolLangData) / [Hugging Face](https://huggingface.co/datasets/ChemFM/MolLangData) | Source molecule-description dataset |
-| MolLangBench | [GitHub](https://github.com/TheLuoFengLab/MolLangBench) / [Hugging Face](https://huggingface.co/datasets/ChemFM/MolLangBench) | External core and extended evaluation dataset |
+| MolLangBench | [GitHub](https://github.com/TheLuoFengLab/MolLangBench) / [Hugging Face](https://huggingface.co/datasets/ChemFM/MolLangBench) | Our previously released benchmark of human-written and human-validated molecular structure descriptions |
 | SFT training corpus | [Hugging Face](https://huggingface.co/datasets/ChemFM/LangMolDiode-SFT-Corpus) / [Box](https://clemson.app.box.com/folder/419341962405) | 75,666 verified reasoning traces and final answers |
 | Model checkpoints | [Hugging Face collection](https://huggingface.co/collections/ChemFM/langmoldiode-checkpoints-6ab584bbd214ff6dc2756714) | Post-SFT model and SFT/RL LoRA adapters |
 
@@ -160,9 +161,9 @@ two gradient-accumulation steps, eight GPUs, and a learning rate of 2e-4.
 
 ## RL Training
 
-Download the released MolLangData training and held-out sets together with the
-external MolLangBench generation benchmark, convert them to verl Parquet, and
-apply the same prompt-token filter used for training:
+Download the released MolLangData training and held-out sets together with our
+previously released MolLangBench generation benchmark, convert them to verl
+Parquet, and apply the same prompt-token filter used for training:
 
 ```bash
 python -m rl.prepare_data \
