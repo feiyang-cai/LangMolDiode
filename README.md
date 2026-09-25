@@ -148,11 +148,10 @@ python rl/filter_prompt_tokens.py \
 
 This produces 161,111 MolLangData training prompts and 1,972 accepted
 MolLangData validation examples. To include the MolLangBench core and extended
-generation sets used in the study, supply a reviewer-provided dataset identifier
-with `--mollangbench-dataset`; no identifying external dataset URL is embedded
-in this anonymous release. Local prepared JSONL can instead be supplied with
-`--train-jsonl`, `--val-jsonl`, `--bench-test-jsonl`, and
-`--bench-extended-jsonl`.
+generation sets used in the study, use the published MolLangBench dataset and
+pass its Hugging Face dataset identifier with `--mollangbench-dataset`. Local
+prepared JSONL can instead be supplied with `--train-jsonl`, `--val-jsonl`,
+`--bench-test-jsonl`, and `--bench-extended-jsonl`.
 
 Launch DAPO from the head of a two-node Ray cluster with eight GPUs per node:
 
