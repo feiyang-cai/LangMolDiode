@@ -14,7 +14,7 @@ def corpus_row(**overrides):
         "sft_response": "<think>Identify ethanol.</think>\n<smiles>CCO</smiles>",
         "generated_smiles": "OCC",
         "generation_model": "teacher-model",
-        "reasoning_effort_effective": "high",
+        "reasoning_effort": "high",
         "matches_smiles": True,
     }
     row.update(overrides)

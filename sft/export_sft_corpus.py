@@ -19,7 +19,7 @@ REQUIRED_COLUMNS = {
     "sft_response",
     "generated_smiles",
     "generation_model",
-    "reasoning_effort_effective",
+    "reasoning_effort",
     "matches_smiles",
 }
 
@@ -44,7 +44,7 @@ def to_training_row(row: dict[str, Any]) -> dict[str, Any]:
         "candidate_smiles": row["generated_smiles"],
         "expected_smiles": row["smiles"],
         "curator_model": row["generation_model"],
-        "reasoning_effort": row["reasoning_effort_effective"],
+        "reasoning_effort": row["reasoning_effort"],
         "sample_id": row["id"],
         "response_mode": "qwen_think",
     }
