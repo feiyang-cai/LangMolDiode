@@ -23,12 +23,12 @@ export TORCH_NCCL_ASYNC_ERROR_HANDLING="${TORCH_NCCL_ASYNC_ERROR_HANDLING:-1}"
 export RAY_TMPDIR="${RAY_TMPDIR:-/tmp/rlv_mg_${USER:-user}_${SLURM_JOB_ID:-local}}"
 export MOLLANG_VERL_PATCH_WANDB_HISTORY="${MOLLANG_VERL_PATCH_WANDB_HISTORY:-1}"
 export MOLLANG_VERL_PATCH_MEMORY_INSTRUMENTATION="${MOLLANG_VERL_PATCH_MEMORY_INSTRUMENTATION:-1}"
-export MOLLANG_REWARD_CONFIG_JSON="${MOLLANG_REWARD_CONFIG_JSON:-{\"tanimoto_weight\":0.8,\"exact_weight\":0.4,\"format_weight\":0.1,\"reasoning_length_penalty_weight\":0.0}}"
+export MOLLANG_REWARD_CONFIG_JSON="${MOLLANG_REWARD_CONFIG_JSON:-{\"tanimoto_weight\":1.0,\"exact_weight\":0.4,\"format_weight\":0.1,\"reasoning_length_penalty_weight\":0.0}}"
 
 max_prompt="${MAX_PROMPT_LENGTH:-2048}"
 max_response="${MAX_RESPONSE_LENGTH:-32768}"
 max_model_len="${MAX_MODEL_LEN:-$((max_prompt + max_response))}"
-overlong_expected_tokens="${OVERLONG_EXPECTED_TOKENS:-8192}"
+overlong_expected_tokens="${OVERLONG_EXPECTED_TOKENS:-2048}"
 if (( max_response > overlong_expected_tokens )); then
   overlong_buffer_len="${OVERLONG_BUFFER_LEN:-$((max_response - overlong_expected_tokens))}"
 else
@@ -52,11 +52,11 @@ ppo_micro_batch="${PPO_MICRO_BATCH_SIZE_PER_GPU:-1}"
 logprob_micro_batch="${LOG_PROB_MICRO_BATCH_SIZE_PER_GPU:-1}"
 ref_logprob_micro_batch="${REF_LOG_PROB_MICRO_BATCH_SIZE_PER_GPU:-1}"
 rollout_correction_bypass_mode="${ROLLOUT_CORRECTION_BYPASS_MODE:-False}"
-rollout_is="${ROLLOUT_IS:-null}"
+rollout_is="${ROLLOUT_IS:-sequence}"
 rollout_is_threshold="${ROLLOUT_IS_THRESHOLD:-2.0}"
-rollout_is_batch_normalize="${ROLLOUT_IS_BATCH_NORMALIZE:-False}"
-rollout_rs="${ROLLOUT_RS:-null}"
-rollout_rs_threshold="${ROLLOUT_RS_THRESHOLD:-null}"
+rollout_is_batch_normalize="${ROLLOUT_IS_BATCH_NORMALIZE:-True}"
+rollout_rs="${ROLLOUT_RS:-seq_mean_k1}"
+rollout_rs_threshold="${ROLLOUT_RS_THRESHOLD:-0.99_1.01}"
 
 echo "[megatron-full] host=$(hostname)"
 echo "[megatron-full] model_path=$model_path"
@@ -65,8 +65,8 @@ echo "[megatron-full] run_name=$run_name output=$output_dir log=$log_path"
 echo "[megatron-full] fixed_bsz actor_dynamic=$actor_use_dynamic_bsz ppo_micro=$ppo_micro_batch logprob_micro=$logprob_micro_batch"
 echo "[megatron-full] rollout n=${NUM_GENERATIONS:-8} train_batch=${TRAIN_BATCH_SIZE:-512} gen_batch=${GEN_BATCH_SIZE:-640} ppo_mini_batch=${PPO_MINI_BATCH_SIZE:-32}"
 echo "[megatron-full] rollout_log_probs=True correction_bypass=$rollout_correction_bypass_mode rollout_is=$rollout_is rollout_is_threshold=$rollout_is_threshold rollout_is_batch_normalize=$rollout_is_batch_normalize rollout_rs=$rollout_rs rollout_rs_threshold=$rollout_rs_threshold"
-echo "[megatron-full] vllm gpu_mem=${VLLM_GPU_MEMORY_UTILIZATION:-0.90} seqs=${VLLM_MAX_NUM_SEQS:-256} bt=${VLLM_MAX_NUM_BATCHED_TOKENS:-8192}"
-echo "[megatron-full] val_before_train=${VAL_BEFORE_TRAIN:-True} test_freq=${TEST_FREQ:-10} save_freq=${SAVE_FREQ:-1}"
+echo "[megatron-full] vllm gpu_mem=${VLLM_GPU_MEMORY_UTILIZATION:-0.875} seqs=${VLLM_MAX_NUM_SEQS:-256} bt=${VLLM_MAX_NUM_BATCHED_TOKENS:-8192}"
+echo "[megatron-full] val_before_train=${VAL_BEFORE_TRAIN:-True} test_freq=${TEST_FREQ:-5} save_freq=${SAVE_FREQ:-1}"
 
 if [[ ! -f "$model_path/config.json" ]]; then
   echo "Missing merged SFT model at $model_path." >&2
@@ -142,7 +142,7 @@ python -m dapo.main_dapo \
   actor_rollout_ref.actor.megatron.tensor_model_parallel_size="${TP:-2}" \
   actor_rollout_ref.actor.megatron.pipeline_model_parallel_size=1 \
   actor_rollout_ref.actor.megatron.context_parallel_size=1 \
-  actor_rollout_ref.actor.megatron.param_offload="${ACTOR_PARAM_OFFLOAD:-False}" \
+  actor_rollout_ref.actor.megatron.param_offload="${ACTOR_PARAM_OFFLOAD:-True}" \
   actor_rollout_ref.actor.megatron.optimizer_offload="${ACTOR_OPTIMIZER_OFFLOAD:-False}" \
   actor_rollout_ref.actor.megatron.grad_offload="${ACTOR_GRAD_OFFLOAD:-False}" \
   actor_rollout_ref.actor.megatron.dtype=bfloat16 \
@@ -153,13 +153,13 @@ python -m dapo.main_dapo \
   actor_rollout_ref.rollout.name=vllm \
   actor_rollout_ref.rollout.mode=async \
   actor_rollout_ref.rollout.tensor_model_parallel_size="${ROLLOUT_TP:-1}" \
-  actor_rollout_ref.rollout.gpu_memory_utilization="${VLLM_GPU_MEMORY_UTILIZATION:-0.90}" \
+  actor_rollout_ref.rollout.gpu_memory_utilization="${VLLM_GPU_MEMORY_UTILIZATION:-0.875}" \
   actor_rollout_ref.rollout.n="${NUM_GENERATIONS:-8}" \
   actor_rollout_ref.rollout.temperature="${TEMPERATURE:-1.0}" \
   actor_rollout_ref.rollout.top_p="${TOP_P:-1.0}" \
   actor_rollout_ref.rollout.top_k="${TOP_K:--1}" \
   ++actor_rollout_ref.rollout.repetition_penalty="${REPETITION_PENALTY:-1.0}" \
-  actor_rollout_ref.rollout.val_kwargs.n="${VAL_GENERATIONS:-1}" \
+  actor_rollout_ref.rollout.val_kwargs.n="${VAL_GENERATIONS:-3}" \
   actor_rollout_ref.rollout.val_kwargs.do_sample="${VAL_DO_SAMPLE:-True}" \
   actor_rollout_ref.rollout.val_kwargs.temperature="${VAL_TEMPERATURE:-1.0}" \
   actor_rollout_ref.rollout.val_kwargs.top_p="${VAL_TOP_P:-0.95}" \
@@ -191,18 +191,18 @@ python -m dapo.main_dapo \
   trainer.project_name="${PROJECT_NAME:-LangMolDiode}" \
   trainer.experiment_name="$run_name" \
   trainer.n_gpus_per_node="${GPUS_PER_NODE:-8}" \
-  trainer.nnodes="${NNODES:-1}" \
+  trainer.nnodes="${NNODES:-2}" \
   trainer.balance_batch="${BALANCE_BATCH:-True}" \
   trainer.val_before_train="${VAL_BEFORE_TRAIN:-True}" \
-  trainer.test_freq="${TEST_FREQ:-10}" \
+  trainer.test_freq="${TEST_FREQ:-5}" \
   trainer.save_freq="${SAVE_FREQ:-1}" \
-  trainer.total_epochs="${TOTAL_EPOCHS:-1}" \
-  trainer.total_training_steps="${TOTAL_TRAINING_STEPS:-315}" \
+  trainer.total_epochs="${TOTAL_EPOCHS:-999}" \
+  trainer.total_training_steps="${TOTAL_TRAINING_STEPS:-1500}" \
   trainer.default_local_dir="$output_dir" \
   trainer.default_hdfs_dir=null \
   trainer.rollout_data_dir="${ROLLOUT_DATA_DIR:-$output_dir/rollouts}" \
   trainer.validation_data_dir="${VALIDATION_DATA_DIR:-$output_dir/validation_generations}" \
-  trainer.log_val_generations="${LOG_VAL_GENERATIONS:-16}" \
+  trainer.log_val_generations="${LOG_VAL_GENERATIONS:-48}" \
   trainer.resume_mode="${RESUME_MODE:-disable}" \
   trainer.resume_from_path="${RESUME_FROM_PATH:-null}" \
   ray_kwargs.ray_init.num_cpus="${RAY_NUM_CPUS:-64}" \

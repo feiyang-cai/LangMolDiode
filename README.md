@@ -19,7 +19,7 @@ The following project resources are hosted anonymously for double-blind review.
 | Resource | Links | Description |
 | --- | --- | --- |
 | MolLangData | [Anonymous Hugging Face dataset](https://huggingface.co/datasets/mollangdata/MolLangData) | Source molecule-description dataset |
-| MolLangBench | Included evaluation sets | Core and extended evaluation sets |
+| MolLangBench | [External Hugging Face dataset](https://huggingface.co/datasets/ChemFM/MolLangBench) | External core and extended generation evaluation sets |
 | SFT training corpus | [Anonymous Hugging Face dataset](https://huggingface.co/datasets/mollangdata/LangMolDiode-SFT-Corpus) | 75,666 verified reasoning traces and final answers |
 | Model checkpoints | [Anonymous Hugging Face collection](https://huggingface.co/collections/mollangdata/langmoldiode-checkpoints-6aad8ee76122dd2c28fde274) | Post-SFT model and SFT/RL LoRA adapters |
 
@@ -126,19 +126,18 @@ bash scripts/run_sft.sh
 
 The launcher accepts environment overrides for sequence length, batch size,
 gradient accumulation, learning rate, evaluation, logging, and checkpoint
-frequency.
+frequency. Its defaults reproduce the final SFT setup: Qwen3.5-4B, three
+epochs, rank-64 LoRA with alpha 128, a 40,960-token limit, batch size 1 per GPU,
+two gradient-accumulation steps, eight GPUs, and a learning rate of 2e-4.
 
 ## RL Training
 
-First convert the MolLangData training prompts and the three evaluation sets to
-verl Parquet files, then apply the prompt-token filter:
+Download the released MolLangData training and held-out sets together with the
+external MolLangBench generation benchmark, convert them to verl Parquet, and
+apply the same prompt-token filter used for training:
 
 ```bash
 python -m rl.prepare_data \
-  --train-jsonl /path/to/train.jsonl \
-  --val-jsonl /path/to/mollangdata_test.jsonl \
-  --bench-test-jsonl /path/to/mollangbench_core.jsonl \
-  --bench-extended-jsonl /path/to/mollangbench_extended.jsonl \
   --output-dir data/verl
 
 python rl/filter_prompt_tokens.py \
@@ -148,18 +147,31 @@ python rl/filter_prompt_tokens.py \
   --max-prompt-length 2048
 ```
 
-Launch DAPO inside the prepared Apptainer environment:
+This produces 161,111 MolLangData training prompts and a combined validation
+file containing 1,972 accepted MolLangData examples plus the 200-example core
+and 200-example extended MolLangBench generation sets. Local prepared JSONL can
+still be supplied with `--train-jsonl`, `--val-jsonl`,
+`--bench-test-jsonl`, and `--bench-extended-jsonl`.
+
+Launch DAPO from the head of a two-node Ray cluster with eight GPUs per node:
 
 ```bash
 MODEL_PATH=/path/to/merged_sft_model \
 TRAIN_FILE=data/verl/train_maxprompt2048.parquet \
 VAL_FILE=data/verl/val_mollangbench_combined.parquet \
 RUN_NAME=langmoldiode_dapo \
-bash scripts/run_in_apptainer.sh scripts/run_rl.sh
+bash scripts/run_in_apptainer.sh scripts/run_rl.sh \
+  +ray_kwargs.ray_init.address=auto \
+  '~ray_kwargs.ray_init.num_cpus'
 ```
 
-Training and rollout settings can be configured with environment variables in
-`scripts/run_rl.sh`.
+The defaults reproduce the final RL setup: 1,500 rollout steps, eight
+generations per prompt, 512 prompt groups per update, a learning rate of 1e-6,
+validation every five steps with three generations, and a checkpoint after
+every step. The reward uses weights 1.0/0.4/0.1 for Tanimoto similarity, exact
+match, and answer format; its overlength penalty ramps from 2,048 to 32,768
+response tokens with a maximum penalty of 0.4. Settings remain configurable
+with environment variables in `scripts/run_rl.sh`.
 
 ## License
 

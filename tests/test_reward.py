@@ -16,7 +16,7 @@ def test_exact_smiles_scores_high() -> None:
     )
     assert out["valid"] == 1.0
     assert out["exact"] == 1.0
-    assert out["score"] > 1.0
+    assert out["score"] == pytest.approx(1.5)
 
 
 def test_uses_answer_after_thinking() -> None:

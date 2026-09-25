@@ -9,7 +9,7 @@
 /wandb/
 /unsloth_compiled_cache/
 /.pytest_cache/
-/__pycache__/
+**/__pycache__/
 /**/*.pyc
 *.sif
 *.safetensors

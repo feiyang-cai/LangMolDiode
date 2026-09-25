@@ -29,7 +29,7 @@ UNCLOSED_SMILES_REJECT_WORDS = {"and", "answer", "final", "smiles", "tag", "tags
 class RewardConfig:
     DEFAULTS = {
         "invalid_penalty": -1.0,
-        "tanimoto_weight": 0.8,
+        "tanimoto_weight": 1.0,
         "exact_weight": 0.4,
         "format_weight": 0.1,
         "reasoning_length_penalty_weight": 0.0,
